@@ -1,12 +1,13 @@
 # Architecture
 
-## Platform
-
 - Native iOS app
 - Swift
 - SwiftUI
-- Minimum deployment target: **iOS 18**
+- Default deployment target: **iOS 26.5**
+- Fallback deployment target: **iOS 18**
 - Xcode project settings are managed by the human in Xcode
+
+The default build targets iOS 26.5. Keep the implementation compatible with iOS 18 so the deployment target can be lowered when broader device support is required. APIs newer than iOS 18 require availability checks or an iOS 18-compatible alternative.
 
 ## Default engineering approach
 

@@ -49,25 +49,24 @@ The initial product targets Apple platforms only. Android and web clients are ou
 
 ---
 
-## 2026-08-19 - Minimum deployment target is iOS 18
+## 2026-08-19 - Default deployment target is iOS 26.5 with iOS 18 fallback
 
 **Decision:**
 
-Target iOS 18 and later.
+Target iOS 26.5 by default. Preserve iOS 18 as the fallback deployment target.
 
 **Reason:**
 
-This provides access to modern SwiftUI, Observation, SwiftData, and platform APIs while maintaining compatibility with a useful range of supported devices.
+The current product target is iOS 26.5, while retaining iOS 18 compatibility keeps a broader deployment option available without requiring a future architectural reset.
 
 **Alternatives considered:**
 
-- iOS 17
-- latest iOS only
+- iOS 18 as the only deployment target
+- latest iOS only without a compatibility fallback
 
 **Consequences:**
 
-Code may rely on APIs available in iOS 18 but should avoid unnecessary use of newer APIs that would force the deployment target upward.
-
+New implementation may use iOS 26.5 APIs by default, but code intended to support the iOS 18 fallback must use availability checks or iOS 18-compatible alternatives. Xcode project settings remain human-managed.
 ---
 
 ## 2026-08-19 - SwiftData local persistence

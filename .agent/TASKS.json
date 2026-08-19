@@ -1,13 +1,13 @@
 {
-  "project": "TODO",
+  "project": "Cartsyne",
   "tasks": [
     {
       "id": "BOOT-001",
       "title": "Confirm baseline project builds and tests",
-      "status": "pending",
+      "status": "done",
       "risk": "low",
       "dependencies": [],
-      "attempts": 0,
+      "attempts": 1,
       "acceptance": [
         "The Xcode project builds for iOS Simulator",
         "Configured automated tests pass or the absence of tests is documented",
