@@ -1,0 +1,7 @@
+# Merge these entries into the repository .gitignore
+.agent/local.env
+.agent/screenshots/
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/

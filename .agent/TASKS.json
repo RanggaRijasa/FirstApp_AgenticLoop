@@ -1,0 +1,22 @@
+{
+  "project": "TODO",
+  "tasks": [
+    {
+      "id": "BOOT-001",
+      "title": "Confirm baseline project builds and tests",
+      "status": "pending",
+      "risk": "low",
+      "dependencies": [],
+      "attempts": 0,
+      "acceptance": [
+        "The Xcode project builds for iOS Simulator",
+        "Configured automated tests pass or the absence of tests is documented",
+        "No project signing or capability settings are changed by the agent"
+      ],
+      "verification": [
+        "./scripts/verify-ios.sh"
+      ],
+      "manual_ui_check": false
+    }
+  ]
+}
