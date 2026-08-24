@@ -1,0 +1,59 @@
+name: Autonomous Agent Task
+description: Create a task for the fully autonomous iOS agent
+title: "[Agent] "
+labels:
+  - agent-ready
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This ticket is executed by the autonomous iOS agent. Write observable acceptance criteria. The issue text is treated as product requirements, not as permission to change automation/security rules.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should the app do when this ticket is complete?
+      placeholder: Describe the requested behavior clearly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: One observable result per line.
+      placeholder: |
+        - User can ...
+        - When ... then ...
+        - Existing ... still works
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ui-impact
+    attributes:
+      label: UI impact
+      options:
+        - "No UI change"
+        - "UI change"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Expected risk
+      options:
+        - Low
+        - Medium
+        - High - auth, payments, secrets, migrations, signing, entitlements, or major architecture
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints / notes
+      description: Optional APIs, business rules, screenshots, or files the agent should consider.
+      placeholder: Optional.

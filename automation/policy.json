@@ -1,0 +1,70 @@
+{
+  "version": 2,
+  "models": {
+    "architect": "openai-codex/gpt-5.6-sol",
+    "implementer": "deepseek/deepseek-v4-flash",
+    "reviewer": "openai-codex/gpt-5.6-luna",
+    "vision": "openai-codex/gpt-5.6-luna",
+    "escalation": "openai-codex/gpt-5.6-sol"
+  },
+  "thinking": {
+    "architect": "high",
+    "implementer": "off",
+    "reviewer": "high",
+    "vision": "medium",
+    "escalation": "xhigh"
+  },
+  "limits": {
+    "maxTasks": 12,
+    "maxTaskAttempts": 3,
+    "maxReviewCycles": 2,
+    "maxVisualCycles": 2,
+    "maxChangedFiles": 30,
+    "maxDiffLines": 2500,
+    "ompTimeoutMinutes": 35,
+    "verifyTimeoutMinutes": 30
+  },
+  "autoMerge": true,
+  "forbiddenAutoEditPrefixes": [
+    ".github/",
+    "automation/",
+    "scripts/",
+    ".omp/",
+    ".claude/",
+    ".cursor/",
+    ".vscode/"
+  ],
+  "reviewRequiredPatterns": [
+    ".pbxproj",
+    ".entitlements",
+    ".xcconfig",
+    "Package.swift",
+    "Package.resolved",
+    "Info.plist"
+  ],
+  "protectedFiles": [
+    ".agent/ARCHITECTURE.md",
+    ".agent/AUTONOMY.md",
+    ".agent/PRODUCT.md",
+    ".agent/TEST_PLAN.md",
+    ".agent/UI_GUIDELINES.md",
+    ".mcp.json",
+    "AGENTS.md",
+    "automation/policy.json",
+    "mcp.json",
+    "scripts/agent-simulator-smoke.sh",
+    "scripts/build-ios.sh",
+    "scripts/ios-doctor.sh",
+    "scripts/setup-agent-labels.sh",
+    "scripts/test-ios.sh",
+    "scripts/verify-ios.sh"
+  ],
+  "secretMarkers": [
+    "DEEPSEEK_API_KEY=",
+    "OPENAI_API_KEY=",
+    "OPENROUTER_API_KEY=",
+    "ghp_",
+    "github_pat_",
+    "sk-or-v1-"
+  ]
+}

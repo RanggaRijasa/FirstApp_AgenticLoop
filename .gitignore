@@ -5,3 +5,7 @@
 xcuserdata/
 *.xcuserstate
 DerivedData/
+.agent/local.env
+.agent/runtime/
+.DS_Store
+DerivedData/

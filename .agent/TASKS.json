@@ -1,13 +1,13 @@
 {
-  "project": "TODO",
+  "project": "Cartsyne",
   "tasks": [
     {
       "id": "BOOT-001",
       "title": "Confirm baseline project builds and tests",
-      "status": "pending",
+      "status": "done",
       "risk": "low",
       "dependencies": [],
-      "attempts": 0,
+      "attempts": 1,
       "acceptance": [
         "The Xcode project builds for iOS Simulator",
         "Configured automated tests pass or the absence of tests is documented",
@@ -17,6 +17,98 @@
         "./scripts/verify-ios.sh"
       ],
       "manual_ui_check": false
+    },
+    {
+      "id": "HOME-001",
+      "title": "Add grocery-list persistence foundation",
+      "status": "done",
+      "risk": "medium",
+      "dependencies": [
+        "BOOT-001"
+      ],
+      "attempts": 0,
+      "acceptance": [
+        "A SwiftData GroceryList model stores a stable identifier, trimmed non-empty name, creation date, and modification date.",
+        "CartsyneApp registers the GroceryList schema in the app ModelContainer without changing signing, capabilities, entitlements, or bundle identifiers.",
+        "Create, fetch, rename, and delete persistence behavior is covered by deterministic Swift Testing tests using an isolated in-memory ModelContainer.",
+        "Persistence errors are propagated to callers rather than silently ignored."
+      ],
+      "verification": [
+        "./scripts/verify-ios.sh",
+        "Automated: GroceryList persistence tests pass for create, fetch, rename, and delete."
+      ],
+      "manual_ui_check": false
+    },
+    {
+      "id": "HOME-002",
+      "title": "Build grocery-lists home and create flow",
+      "status": "pending",
+      "risk": "medium",
+      "dependencies": [
+        "HOME-001"
+      ],
+      "attempts": 0,
+      "acceptance": [
+        "The app launches directly into a NavigationStack titled Grocery Lists with no login, setup, dashboard, or onboarding screen.",
+        "An empty store shows Your grocery lists live here., Create a list to start shopping., and a working Create List action.",
+        "Create List presents a sheet whose name field receives keyboard focus, rejects empty or whitespace-only input, trims surrounding whitespace, and preserves entered text after a recoverable save failure.",
+        "Saving Weekly Groceries dismisses the sheet, immediately shows the new list in the populated home, and the list remains after app relaunch.",
+        "Populated lists are ordered by updatedAt descending with stable identifier order as the tie-breaker.",
+        "A persistence failure displays an understandable retryable error without exposing a raw Swift error.",
+        "The empty and populated states support VoiceOver, Light and Dark Mode, Dynamic Type, and comfortable native hit targets."
+      ],
+      "verification": [
+        "./scripts/verify-ios.sh",
+        "Automated: a focused UI test launches with an isolated empty store, creates Weekly Groceries, and verifies the row appears.",
+        "Manual: from an empty store, create Weekly Groceries, relaunch, and confirm it remains; check keyboard focus, Light and Dark Mode, VoiceOver labels, and a large accessibility text size."
+      ],
+      "manual_ui_check": true
+    },
+    {
+      "id": "HOME-003",
+      "title": "Add grocery-list rename flow",
+      "status": "pending",
+      "risk": "low",
+      "dependencies": [
+        "HOME-002"
+      ],
+      "attempts": 0,
+      "acceptance": [
+        "A discoverable native Edit action opens a sheet prefilled with the selected list name and focused name field.",
+        "Rename rejects empty or whitespace-only input, trims surrounding whitespace, updates updatedAt only after a successful save, and reorders the home consistently with updatedAt descending.",
+        "A successful rename appears immediately and persists after app relaunch.",
+        "A failed rename keeps the edit sheet and entered value available for retry and presents an understandable error.",
+        "Edit controls expose meaningful VoiceOver labels and remain usable with large Dynamic Type."
+      ],
+      "verification": [
+        "./scripts/verify-ios.sh",
+        "Automated: persistence tests verify rename and updatedAt behavior; the home UI test verifies Weekly Groceries can be renamed to Household.",
+        "Manual: rename Weekly Groceries to Household, relaunch, and confirm the new name and ordering persist; verify empty-name validation and keyboard behavior."
+      ],
+      "manual_ui_check": true
+    },
+    {
+      "id": "HOME-004",
+      "title": "Add confirmed grocery-list deletion",
+      "status": "pending",
+      "risk": "medium",
+      "dependencies": [
+        "HOME-002"
+      ],
+      "attempts": 0,
+      "acceptance": [
+        "A discoverable native destructive action asks Delete \u201c<list name>\u201d? before deleting an entire grocery list.",
+        "The confirmation explains This will also delete all items in this list. and offers explicit cancel and destructive confirmation actions.",
+        "Cancel leaves the list unchanged; confirmation removes only the selected list and persists after app relaunch.",
+        "A failed deletion leaves the persisted list recoverable in the UI and presents an understandable error.",
+        "Delete and confirmation controls communicate destructive intent to VoiceOver and remain usable with large Dynamic Type."
+      ],
+      "verification": [
+        "./scripts/verify-ios.sh",
+        "Automated: persistence tests verify deletion affects only the selected list; a focused UI test verifies both cancel and confirmed-delete outcomes.",
+        "Manual: cancel deletion once, then confirm deletion, relaunch, and verify only the selected list is gone; check the confirmation in Light and Dark Mode with VoiceOver."
+      ],
+      "manual_ui_check": true
     }
   ]
 }

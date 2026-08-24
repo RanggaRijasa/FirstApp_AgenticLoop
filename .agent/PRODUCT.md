@@ -196,22 +196,15 @@ Prefer a simple subscription or one-time purchase rather than advertising.
 
 No monetization is required for the first MVP release.
 
-## Minimum iOS version
+## Supported iOS versions
 
-**iOS 18**
+**Default target: iOS 26.5**
 
-### Reasoning
+**Fallback target: iOS 18**
 
-iOS 18 provides a good balance between:
+Cartsyne's default deployment target is iOS 26.5. The codebase should retain iOS 18 compatibility as the fallback target when broader device support is required.
 
-- Supporting a broad range of active iPhone users.
-- Modern SwiftUI APIs.
-- SwiftData support.
-- App Intents integration potential.
-- Modern navigation and observation patterns.
-- Reduced need for compatibility code.
-
-The architecture should avoid depending unnecessarily on newer APIs so that the minimum deployment target can remain iOS 18.
+The architecture should avoid depending unnecessarily on APIs newer than the selected deployment target. When using the iOS 18 fallback, APIs introduced after iOS 18 must be protected with availability checks or replaced with iOS 18-compatible alternatives.
 
 ## Success criteria
 

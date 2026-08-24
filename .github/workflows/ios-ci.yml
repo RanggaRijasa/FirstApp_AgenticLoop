@@ -1,0 +1,41 @@
+name: iOS CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: [self-hosted, macOS, ios-agent]
+    timeout-minutes: 60
+    env:
+      IOS_CONTAINER: ${{ vars.IOS_CONTAINER }}
+      IOS_SCHEME: ${{ vars.IOS_SCHEME }}
+      IOS_SIMULATOR: ${{ vars.IOS_SIMULATOR }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create local Xcode config
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .agent/runtime
+          cat > .agent/local.env <<ENV
+          IOS_CONTAINER="$IOS_CONTAINER"
+          IOS_SCHEME="$IOS_SCHEME"
+          IOS_SIMULATOR="$IOS_SIMULATOR"
+          ENV
+
+      - name: Deterministic verify
+        shell: bash
+        run: ./scripts/verify-ios.sh
+
+      - name: Simulator smoke
+        shell: bash
+        run: ./scripts/agent-simulator-smoke.sh

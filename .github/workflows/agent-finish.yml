@@ -1,0 +1,26 @@
+name: Agent Issue Finish
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  issues: write
+
+jobs:
+  finish:
+    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'agent/issue-')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - name: Mark linked issue done
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$HEAD_REF" =~ ^agent/issue-([0-9]+)$ ]]; then
+            ISSUE="${BASH_REMATCH[1]}"
+            gh issue edit "$ISSUE" --remove-label agent-running --remove-label agent-review-required --add-label agent-done || true
+          fi
