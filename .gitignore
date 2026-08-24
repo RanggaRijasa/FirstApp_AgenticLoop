@@ -1,11 +1,13 @@
-# Merge these entries into the repository .gitignore
+# Multica / autonomous iOS runtime artifacts
+.multica/
 .agent/local.env
 .agent/screenshots/
-.DS_Store
+.agent/runtime/
+DerivedData/
+
+# Xcode user state
 xcuserdata/
 *.xcuserstate
-DerivedData/
-.agent/local.env
-.agent/runtime/
+
+# macOS metadata
 .DS_Store
-DerivedData/

@@ -6,4 +6,4 @@ set -euo pipefail
 
 echo
 echo "VERIFY_OK: build and automated tests passed."
-echo "If this task changes UI, launch the app manually from Xcode and perform the manual UI check before marking it done."
+echo "If UI changed, run ./scripts/agent-simulator-smoke.sh and review the latest screenshot before delivery."

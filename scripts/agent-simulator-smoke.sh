@@ -1,70 +1,65 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
-
-if [[ ! -f .agent/local.env ]]; then
-  echo "Missing .agent/local.env"
-  exit 1
-fi
 # shellcheck disable=SC1091
-source .agent/local.env
+source "$(dirname "$0")/_xcode-common.sh"
 
-: "${IOS_CONTAINER:?missing IOS_CONTAINER}"
-: "${IOS_SCHEME:?missing IOS_SCHEME}"
-: "${IOS_SIMULATOR:?missing IOS_SIMULATOR}"
+: "${IOS_SIMULATOR:?Set IOS_SIMULATOR in the environment or .agent/local.env}"
 
-RUNTIME="$ROOT/.agent/runtime"
-DERIVED="$RUNTIME/DerivedData"
-SCREENSHOT="$RUNTIME/simulator-latest.png"
-mkdir -p "$RUNTIME"
-rm -rf "$DERIVED"
+mkdir -p .agent/runtime .agent/screenshots
+DERIVED_DATA="$(pwd)/.agent/runtime/DerivedData"
 
-if [[ "$IOS_CONTAINER" == *.xcworkspace ]]; then
-  CONTAINER_ARGS=(-workspace "$IOS_CONTAINER")
-else
-  CONTAINER_ARGS=(-project "$IOS_CONTAINER")
-fi
-
-DEVICE_LINE="$(xcrun simctl list devices available | grep -F "$IOS_SIMULATOR (" | head -n 1 || true)"
+DEVICE_LINE="$(xcrun simctl list devices available | grep -F "${IOS_SIMULATOR} (" | head -n 1 || true)"
 if [[ -z "$DEVICE_LINE" ]]; then
-  echo "Simulator not found: $IOS_SIMULATOR"
-  exit 1
-fi
-UDID="$(echo "$DEVICE_LINE" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')"
-if [[ -z "$UDID" || "$UDID" == "$DEVICE_LINE" ]]; then
-  echo "Could not parse Simulator UDID from: $DEVICE_LINE"
+  echo "ERROR: Simulator '$IOS_SIMULATOR' not found."
+  echo "Run: xcrun simctl list devices available"
   exit 1
 fi
 
+UDID="$(printf '%s\n' "$DEVICE_LINE" | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')"
+if [[ ! "$UDID" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+  echo "ERROR: Could not parse simulator UDID from: $DEVICE_LINE"
+  exit 1
+fi
+
+echo "Booting $IOS_SIMULATOR ($UDID) ..."
 xcrun simctl boot "$UDID" >/dev/null 2>&1 || true
 xcrun simctl bootstatus "$UDID" -b
 
+echo "Building app for simulator ..."
+rm -rf "$DERIVED_DATA"
 xcodebuild \
-  "${CONTAINER_ARGS[@]}" \
+  "${XCODE_CONTAINER_ARGS[@]}" \
   -scheme "$IOS_SCHEME" \
-  -destination "platform=iOS Simulator,id=$UDID" \
-  -derivedDataPath "$DERIVED" \
   -configuration Debug \
+  -destination "id=$UDID" \
+  -derivedDataPath "$DERIVED_DATA" \
   build
 
-APP_PATH="$(find "$DERIVED/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name '*.app' -type d | head -n 1)"
+PRODUCTS="$DERIVED_DATA/Build/Products/Debug-iphonesimulator"
+APP_PATH="$(find "$PRODUCTS" -maxdepth 1 -type d -name '*.app' ! -name '*Tests*' ! -name '*UITests*' | head -n 1 || true)"
 if [[ -z "$APP_PATH" ]]; then
-  echo "Built .app not found"
+  echo "ERROR: Built .app not found in $PRODUCTS"
   exit 1
 fi
 
-BUNDLE_ID="$(xcodebuild "${CONTAINER_ARGS[@]}" -scheme "$IOS_SCHEME" -configuration Debug -showBuildSettings | awk -F ' = ' '/PRODUCT_BUNDLE_IDENTIFIER/ {print $2; exit}')"
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist" 2>/dev/null || true)"
 if [[ -z "$BUNDLE_ID" ]]; then
-  echo "Could not determine PRODUCT_BUNDLE_IDENTIFIER"
+  echo "ERROR: Could not determine CFBundleIdentifier from $APP_PATH"
   exit 1
 fi
 
+xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+xcrun simctl uninstall "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl install "$UDID" "$APP_PATH"
 xcrun simctl launch "$UDID" "$BUNDLE_ID"
-sleep 3
-xcrun simctl io "$UDID" screenshot "$SCREENSHOT"
+sleep "${IOS_SMOKE_WAIT_SECONDS:-4}"
 
+STAMP="$(date +%Y%m%d-%H%M%S)"
+SHOT=".agent/screenshots/simulator-${STAMP}.png"
+xcrun simctl io "$UDID" screenshot "$SHOT"
+
+echo
 echo "SIMULATOR_SMOKE_OK"
-echo "SCREENSHOT=$SCREENSHOT"
+echo "Simulator: $IOS_SIMULATOR"
+echo "Bundle:    $BUNDLE_ID"
+echo "Screenshot: $SHOT"
