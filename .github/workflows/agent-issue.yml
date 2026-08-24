@@ -1,0 +1,67 @@
+name: Autonomous iOS Agent
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  run-agent:
+    if: github.event.label.name == 'agent-ready'
+    runs-on: [self-hosted, macOS, ios-agent]
+    timeout-minutes: 180
+
+    env:
+      GH_TOKEN: ${{ secrets.AGENT_GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+      BASE_BRANCH: ${{ github.event.repository.default_branch }}
+      REPO_PRIVATE: ${{ github.event.repository.private }}
+      IOS_CONTAINER: ${{ vars.IOS_CONTAINER }}
+      IOS_SCHEME: ${{ vars.IOS_SCHEME }}
+      IOS_SIMULATOR: ${{ vars.IOS_SIMULATOR }}
+      AGENT_ALLOWED_ACTORS: ${{ vars.AGENT_ALLOWED_ACTORS }}
+      ALLOW_PUBLIC_AUTONOMY: ${{ vars.ALLOW_PUBLIC_AUTONOMY }}
+
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Runner doctor
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in git gh bun omp xcodebuild xcrun; do
+            command -v "$tool" >/dev/null || { echo "Missing tool: $tool"; exit 1; }
+          done
+          omp --version
+          xcodebuild -version
+          gh --version
+          bun --version
+          test -n "$GH_TOKEN" || { echo "Missing secret: AGENT_GITHUB_TOKEN"; exit 1; }
+          gh auth status
+
+      - name: Create local Xcode config
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .agent/runtime .agent/issues
+          test -n "$IOS_CONTAINER"
+          test -n "$IOS_SCHEME"
+          test -n "$IOS_SIMULATOR"
+          cat > .agent/local.env <<ENV
+          IOS_CONTAINER="$IOS_CONTAINER"
+          IOS_SCHEME="$IOS_SCHEME"
+          IOS_SIMULATOR="$IOS_SIMULATOR"
+          ENV
+
+      - name: Run autonomous controller
+        shell: bash
+        run: bun automation/controller.ts

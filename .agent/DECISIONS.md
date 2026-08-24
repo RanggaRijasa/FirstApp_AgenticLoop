@@ -69,6 +69,28 @@ The current product target is iOS 26.5, while retaining iOS 18 compatibility kee
 New implementation may use iOS 26.5 APIs by default, but code intended to support the iOS 18 fallback must use availability checks or iOS 18-compatible alternatives. Xcode project settings remain human-managed.
 ---
 
+## 2026-08-19 - Grocery lists are the app home
+
+**Decision:**
+
+Launch directly into Grocery Lists inside a NavigationStack. Create and edit lists in sheets; push the selected list's Shopping List when that feature is available. Do not add a dashboard, tab bar, or mandatory onboarding for MVP.
+
+**Reason:**
+
+The product must minimize time from launch to creating or opening a grocery list, and the documented navigation hierarchy is Grocery Lists → Shopping List → Item Editor.
+
+**Alternatives considered:**
+
+- Dashboard home
+- Launch into the most recently used list
+- Tab-based root navigation
+
+**Consequences:**
+
+Home owns grocery-list collection management; shopping contents remain feature-scoped; launch does not depend on an account or network.
+
+---
+
 ## 2026-08-19 - SwiftData local persistence
 
 **Decision:**
