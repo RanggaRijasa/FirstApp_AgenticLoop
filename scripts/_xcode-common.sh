@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Multica v5 supports either pre-injected environment variables or the v3 local file.
+# Pre-injected environment variables always win. The v3 .agent/local.env file is
+# only a fallback for values the caller did not already provide.
 if [[ -f .agent/local.env ]]; then
-  # shellcheck disable=SC1091
-  source .agent/local.env
+  while IFS='=' read -r _key _value; do
+    _key="${_key%$'\r'}"
+    [[ "$_key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    # Never overwrite a value already present in the environment.
+    [[ -z "${!_key:-}" ]] || continue
+    _value="${_value%$'\r'}"
+    # Strip surrounding quotes, mirroring shell sourcing of KEY="value" lines.
+    _value="${_value#\"}"; _value="${_value%\"}"
+    _value="${_value#\'}"; _value="${_value%\'}"
+    export "$_key=$_value"
+  done < .agent/local.env
 fi
 
 : "${IOS_CONTAINER:?Set IOS_CONTAINER in the environment or .agent/local.env}"
