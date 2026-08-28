@@ -76,15 +76,29 @@ struct GroceryListsModelTests {
         #expect(model.lists.map(\.name) == ["Low", "High"])
     }
 
-    @Test func loadSurfacesUnderstandableErrorOnFailure() throws {
-        // A fresh store has no lists and therefore no error.
-        let model = try makeModel(inserting: [])
+    @Test func loadFailureShowsUnderstandableMessageAndRetryRecovers() throws {
+        let repository = ScriptedGroceryRepository()
+        let model = GroceryListsModel(repository: repository)
+        repository.storedLists = [
+            GroceryList(id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!, name: "Weekly"),
+        ]
+
+        repository.fetchError = UnderlyingPersistenceFailure()
+        model.load()
+
+        #expect(model.lists.isEmpty)
+        // Understandable, retryable message; no raw Swift error text leaks.
+        #expect(model.loadError == "Couldn't load your grocery lists. Please try again.")
+        #expect(model.loadError?.contains("134060") != true)
+
+        // The Try Again path recovers once the underlying store is reachable.
+        repository.fetchError = nil
         model.load()
         #expect(model.loadError == nil)
-        #expect(model.lists.isEmpty)
+        #expect(model.lists.map(\.name) == ["Weekly"])
     }
 
-    @Test func createFailureKeepsInputAndSetsUnderstandableMessage() throws {
+    @Test func createRejectsWhitespaceOnlyNameWithUnderstandableMessage() throws {
         let model = try makeModel(inserting: [])
 
         let didCreate = model.createList(named: "   ")
@@ -95,6 +109,44 @@ struct GroceryListsModelTests {
         #expect(model.createError == "Enter a list name.")
     }
 
+    @Test func createPersistenceFailureKeepsInputShowsFriendlyMessageAndRetrySucceeds() throws {
+        let repository = ScriptedGroceryRepository()
+        let model = GroceryListsModel(repository: repository)
+        let input = "  Weekly Groceries  "
+
+        // A recoverable save failure: the first attempt fails to persist.
+        repository.nextCreateError = UnderlyingPersistenceFailure()
+        let didCreate = model.createList(named: input)
+
+        #expect(didCreate == false)
+        #expect(model.lists.isEmpty)
+        #expect(model.createError == "We couldn't create your list. Please try again.")
+        #expect(model.createError?.contains("134060") != true)
+
+        // The sheet keeps the entered text; retrying with the same input
+        // succeeds and persists exactly one trimmed list.
+        let retried = model.createList(named: input)
+        #expect(retried == true)
+        #expect(model.lists.map(\.name) == ["Weekly Groceries"])
+        #expect(model.createError == nil)
+    }
+
+    @Test func createPlacesNewListFirstByUpdatedAt() throws {
+        let repository = ScriptedGroceryRepository()
+        repository.storedLists = [
+            GroceryList(id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!, name: "Old", updatedAt: Date(timeIntervalSince1970: 100)),
+            GroceryList(id: UUID(uuidString: "10000000-0000-0000-0000-000000000002")!, name: "Middle", updatedAt: Date(timeIntervalSince1970: 200)),
+        ]
+        let model = GroceryListsModel(repository: repository)
+        model.load()
+        #expect(model.lists.map(\.name) == ["Middle", "Old"])
+
+        // A fresh list has the newest updatedAt and is ordered first
+        // immediately, before any reload.
+        #expect(model.createList(named: "Weekly Groceries") == true)
+        #expect(model.lists.map(\.name) == ["Weekly Groceries", "Middle", "Old"])
+    }
+
     @Test func createTrimmedNameAppearsInList() throws {
         let model = try makeModel(inserting: [])
 
@@ -103,4 +155,44 @@ struct GroceryListsModelTests {
         #expect(didCreate == true)
         #expect(model.lists.map(\.name) == ["Weekly Groceries"])
     }
+}
+
+/// Deterministic repository double for exercising failure paths a real
+/// SwiftData store cannot produce on demand: load failures, recoverable save
+/// failures, and one-shot retry behavior.
+@MainActor
+private final class ScriptedGroceryRepository: GroceryRepository {
+    /// Error thrown by the next `fetchLists()` call; `nil` fetches normally.
+    var fetchError: (any Error)?
+    /// Error thrown by the next `createList` call, consumed by that one call.
+    var nextCreateError: (any Error)?
+    /// Lists returned by a successful fetch and appended by successful creates.
+    var storedLists: [GroceryList] = []
+
+    func fetchLists() throws -> [GroceryList] {
+        if let fetchError {
+            throw fetchError
+        }
+        return storedLists
+    }
+
+    func createList(named name: String) throws -> GroceryList {
+        if let nextCreateError {
+            self.nextCreateError = nil
+            throw nextCreateError
+        }
+        let list = GroceryList(name: name)
+        storedLists.append(list)
+        return list
+    }
+
+    func renameList(id: UUID, to name: String) throws {}
+
+    func deleteList(id: UUID) throws {}
+}
+
+/// Stand-in for an underlying persistence error; the UI must never expose its
+/// technical description to the user.
+private struct UnderlyingPersistenceFailure: LocalizedError {
+    var errorDescription: String? { "NSPersistentStore save failed (code 134060)" }
 }

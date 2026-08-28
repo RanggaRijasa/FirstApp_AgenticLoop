@@ -17,6 +17,13 @@ import SwiftData
 struct SwiftDataGroceryRepository: GroceryRepository {
     private let modelContainer: ModelContainer
 
+    /// Test seam: when set, replaces the real context save with this closure.
+    /// A genuine SwiftData save failure cannot be produced deterministically
+    /// through public API (unique constraints merge rather than throw), so
+    /// deterministic tests use this to exercise the repository's real
+    /// insert-then-failed-save-then-rollback path. Production never sets it.
+    var saveInterceptor: (@MainActor () throws -> Void)?
+
     init(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
     }
@@ -33,7 +40,7 @@ struct SwiftDataGroceryRepository: GroceryRepository {
     func createList(named name: String) throws -> GroceryList {
         let list = try validatedList(named: name)
         context.insert(list)
-        try context.save()
+        try persist()
         return list
     }
 
@@ -44,7 +51,7 @@ struct SwiftDataGroceryRepository: GroceryRepository {
         }
         list.name = trimmedName
         list.updatedAt = Date()
-        try context.save()
+        try persist()
     }
 
     func deleteList(id: UUID) throws {
@@ -52,7 +59,24 @@ struct SwiftDataGroceryRepository: GroceryRepository {
             throw GroceryListError.notFound
         }
         context.delete(list)
-        try context.save()
+        try persist()
+    }
+
+    /// Saves pending changes, rolling the context back on failure so a failed
+    /// save never leaves inserted or mutated models pending. Without the
+    /// rollback, a failed create keeps its insert in the context and a later
+    /// successful save (for example a retry) persists a duplicate.
+    private func persist() throws {
+        do {
+            if let saveInterceptor {
+                try saveInterceptor()
+            } else {
+                try context.save()
+            }
+        } catch {
+            context.rollback()
+            throw error
+        }
     }
 
     /// Builds a new list with a validated (trimmed, non-empty) name.
