@@ -1,5 +1,6 @@
 # Multica / autonomous iOS runtime artifacts
 .multica/
+.omp/skills/
 .agent/local.env
 .agent/screenshots/
 .agent/runtime/
