@@ -23,12 +23,20 @@ final class GroceryListsModel {
 
     /// Understandable message explaining a home-level load failure, if any.
     private(set) var loadError: String?
-
     /// Understandable message explaining the most recent create failure, if any.
     private(set) var createError: String?
 
     /// Controls presentation of the create-list sheet.
     var isPresentingCreateSheet = false
+
+    /// The list being edited, while the edit sheet is presented.
+    private(set) var editingList: GroceryList?
+
+    /// Controls presentation of the edit-list sheet.
+    var isPresentingEditSheet = false
+
+    /// Understandable message explaining the most recent rename failure, if any.
+    private(set) var editError: String?
 
     init(repository: any GroceryRepository) {
         self.repository = repository
@@ -77,6 +85,43 @@ final class GroceryListsModel {
             return false
         } catch {
             createError = "We couldn't create your list. Please try again."
+            return false
+        }
+    }
+
+    /// Prepares the home for the edit flow: clears any prior rename error,
+    /// selects the list, and presents the edit-list sheet prefilled with the
+    /// list's current name.
+    func startEditing(_ list: GroceryList) {
+        editError = nil
+        editingList = list
+        isPresentingEditSheet = true
+    }
+
+    /// Renames the selected list using the repository's validated, trimmed
+    /// save, then reorders immediately by `updatedAt` descending.
+    ///
+    /// - Returns: `true` when the rename was saved and the sheet may dismiss;
+    ///   `false` otherwise. On failure, ``editError`` holds an understandable,
+    ///   retryable message, the sheet stays open with the typed value intact,
+    ///   and the list keeps its prior name and `updatedAt` (the repository
+    ///   rolls back the failed save).
+    @discardableResult
+    func renameList(_ list: GroceryList, to name: String) -> Bool {
+        do {
+            let renamed = try repository.renameList(id: list.id, to: name)
+            if let index = lists.firstIndex(where: { $0.id == renamed.id }) {
+                lists[index] = renamed
+            }
+            lists.sort(by: isOrderedBeforeUpdateOrID)
+            editError = nil
+            editingList = nil
+            return true
+        } catch let error as GroceryListError where error == .emptyName {
+            editError = "Enter a list name."
+            return false
+        } catch {
+            editError = "We couldn't rename your list. Please try again."
             return false
         }
     }

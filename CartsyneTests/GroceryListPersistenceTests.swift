@@ -120,12 +120,37 @@ struct GroceryListPersistenceTests {
         #expect(try repository.fetchLists().first?.name == originalName)
     }
 
-    @Test func renameUnknownIDThrowsNotFound() async throws {
-        let repository = try makeRepository()
+    @Test func renameSaveFailureRollsBackNameAndUpdatedAtSoRetrySucceeds() async throws {
+        let schema = Schema([GroceryList.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        var repository = SwiftDataGroceryRepository(modelContainer: container)
+        let created = try repository.createList(named: "Weekly Groceries")
+        let originalName = created.name
+        let originalUpdatedAt = created.updatedAt
 
-        #expect(throws: GroceryListError.notFound) {
-            try repository.renameList(id: UUID(), to: "Any")
+        // First rename fails: the real mutate-then-save path is exercised with
+        // the save itself failing deterministically.
+        repository.saveInterceptor = {
+            throw UnderlyingPersistenceFailure()
         }
+        #expect(throws: (any Error).self) {
+            _ = try repository.renameList(id: created.id, to: "Household")
+        }
+        // The failed save must not leave the mutation pending; the rollback
+        // boundary preserves the prior name and updatedAt.
+        #expect(created.name == originalName)
+        #expect(created.updatedAt == originalUpdatedAt)
+
+        // Retry after the store recovers persists exactly the renamed list.
+        repository.saveInterceptor = nil
+        let renamed = try repository.renameList(id: created.id, to: "  Household  ")
+        let lists = try repository.fetchLists()
+        #expect(lists.count == 1)
+        #expect(lists.first?.id == renamed.id)
+        #expect(lists.first?.name == "Household")
+        #expect(lists.first?.updatedAt != originalUpdatedAt)
     }
 
     @Test func deleteRemovesOnlyTheSelectedList() async throws {
