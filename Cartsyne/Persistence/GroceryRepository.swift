@@ -27,7 +27,7 @@ protocol GroceryRepository {
     ///
     /// Surrounding whitespace is trimmed and an empty or whitespace-only name
     /// is rejected with ``GroceryListError/emptyName``.
-    func renameList(id: UUID, to name: String) throws
+    func renameList(id: UUID, to name: String) throws -> GroceryList
 
     /// Deletes an existing list.
     func deleteList(id: UUID) throws

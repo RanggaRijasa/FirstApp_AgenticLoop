@@ -147,13 +147,101 @@ struct GroceryListsModelTests {
         #expect(model.lists.map(\.name) == ["Weekly Groceries", "Middle", "Old"])
     }
 
-    @Test func createTrimmedNameAppearsInList() throws {
-        let model = try makeModel(inserting: [])
+    @Test func startEditingSelectsListAndClearsPriorError() throws {
+        let repository = ScriptedGroceryRepository()
+        let list = GroceryList(id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!, name: "Weekly")
+        repository.storedLists = [list]
+        let model = GroceryListsModel(repository: repository)
+        model.load()
 
-        let didCreate = model.createList(named: "  Weekly Groceries  ")
+        // Force a prior error state to prove selection clears it.
+        model.renameList(list, to: "   ")
+        #expect(model.editError == "Enter a list name.")
 
-        #expect(didCreate == true)
+        model.startEditing(list)
+
+        #expect(model.editingList?.id == list.id)
+        #expect(model.isPresentingEditSheet == true)
+        #expect(model.editError == nil)
+    }
+
+    @Test func renameRejectsWhitespaceOnlyNameWithUnderstandableMessage() throws {
+        let repository = ScriptedGroceryRepository()
+        let list = GroceryList(id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!, name: "Weekly")
+        repository.storedLists = [list]
+        let model = GroceryListsModel(repository: repository)
+        model.load()
+        model.startEditing(list)
+
+        let didRename = model.renameList(list, to: "   ")
+
+        #expect(didRename == false)
+        #expect(model.editError == "Enter a list name.")
+        // The sheet stays open with the list still selected for retry.
+        #expect(model.editingList?.id == list.id)
+        #expect(model.lists.map(\.name) == ["Weekly"])
+    }
+
+    @Test func renameFailureKeepsPriorNameAndTimestampShowsFriendlyMessageAndRetrySucceeds() throws {
+        let repository = ScriptedGroceryRepository()
+        let original = Date(timeIntervalSince1970: 100)
+        let list = GroceryList(
+            id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!,
+            name: "Weekly Groceries",
+            updatedAt: original
+        )
+        repository.storedLists = [list]
+        let model = GroceryListsModel(repository: repository)
+        model.load()
+        model.startEditing(list)
+
+        // A recoverable save failure: the first attempt fails to persist.
+        repository.nextRenameError = UnderlyingPersistenceFailure()
+        let didRename = model.renameList(list, to: "Household")
+
+        #expect(didRename == false)
+        #expect(model.editError == "We couldn't rename your list. Please try again.")
+        #expect(model.editError?.contains("134060") != true)
+        // Rollback boundary: the prior name, timestamp, and selection survive.
         #expect(model.lists.map(\.name) == ["Weekly Groceries"])
+        #expect(model.lists.first?.updatedAt == original)
+        #expect(model.editingList?.id == list.id)
+
+        // Retry with the same input succeeds and persists the rename.
+        let retried = model.renameList(list, to: "Household")
+        #expect(retried == true)
+        #expect(model.editError == nil)
+        #expect(model.lists.map(\.name) == ["Household"])
+        #expect(model.lists.first?.updatedAt != original)
+    }
+
+    @Test func renameTrimsNameBumpsTimestampAndReordersImmediately() throws {
+        let repository = ScriptedGroceryRepository()
+        let old = GroceryList(
+            id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!,
+            name: "Old",
+            updatedAt: Date(timeIntervalSince1970: 100)
+        )
+        let middle = GroceryList(
+            id: UUID(uuidString: "10000000-0000-0000-0000-000000000002")!,
+            name: "Middle",
+            updatedAt: Date(timeIntervalSince1970: 200)
+        )
+        repository.storedLists = [old, middle]
+        let model = GroceryListsModel(repository: repository)
+        model.load()
+        #expect(model.lists.map(\.name) == ["Middle", "Old"])
+        model.startEditing(old)
+
+        // Renaming the oldest list gives it the newest timestamp, so it must
+        // move to the top immediately, before any reload.
+        let didRename = model.renameList(old, to: "  Household  ")
+
+        #expect(didRename == true)
+        #expect(model.lists.map(\.name) == ["Household", "Middle"])
+        #expect(model.lists.first?.updatedAt ?? .distantPast > middle.updatedAt)
+        // The repository's trimmed name is what the home shows.
+        #expect(model.lists.first?.name == "Household")
     }
 }
 
@@ -166,6 +254,8 @@ private final class ScriptedGroceryRepository: GroceryRepository {
     var fetchError: (any Error)?
     /// Error thrown by the next `createList` call, consumed by that one call.
     var nextCreateError: (any Error)?
+    /// Error thrown by the next `renameList` call, consumed by that one call.
+    var nextRenameError: (any Error)?
     /// Lists returned by a successful fetch and appended by successful creates.
     var storedLists: [GroceryList] = []
 
@@ -186,7 +276,25 @@ private final class ScriptedGroceryRepository: GroceryRepository {
         return list
     }
 
-    func renameList(id: UUID, to name: String) throws {}
+    func renameList(id: UUID, to name: String) throws -> GroceryList {
+        if let nextRenameError {
+            self.nextRenameError = nil
+            throw nextRenameError
+        }
+        // Mirrors the real repository: validate, trim, bump updatedAt, and
+        // return the renamed list so the model reflects the persisted state.
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            throw GroceryListError.emptyName
+        }
+        guard let index = storedLists.firstIndex(where: { $0.id == id }) else {
+            throw GroceryListError.notFound
+        }
+        let list = storedLists[index]
+        list.name = trimmedName
+        list.updatedAt = Date()
+        return list
+    }
 
     func deleteList(id: UUID) throws {}
 }

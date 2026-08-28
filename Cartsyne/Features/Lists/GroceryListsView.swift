@@ -11,7 +11,8 @@ import SwiftUI
 ///
 /// Launches directly into the list of grocery lists with no login, setup,
 /// dashboard, or onboarding. Handles the empty, populated, and load-error
-/// states.
+/// states. Each row exposes a native, discoverable Edit action that opens the
+/// prefilled edit sheet.
 struct GroceryListsView: View {
     @Bindable var model: GroceryListsModel
 
@@ -31,6 +32,11 @@ struct GroceryListsView: View {
                 }
                 .sheet(isPresented: $model.isPresentingCreateSheet) {
                     CreateListSheet(model: model)
+                }
+                .sheet(isPresented: $model.isPresentingEditSheet) {
+                    if let list = model.editingList {
+                        EditListSheet(model: model, list: list)
+                    }
                 }
                 .task {
                     model.load()
@@ -54,6 +60,23 @@ struct GroceryListsView: View {
         } else {
             List(model.lists, id: \.id) { list in
                 Text(list.name)
+                    // Native, discoverable row Edit affordance: swipe reveals
+                    // an Edit action, and long-press shows the same action in
+                    // a context menu. Both open the prefilled edit sheet.
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button {
+                            model.startEditing(list)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                    }
+                    .contextMenu {
+                        Button {
+                            model.startEditing(list)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                    }
             }
         }
     }
@@ -99,7 +122,9 @@ private struct PreviewRepository: GroceryRepository {
         throw GroceryListError.emptyName
     }
 
-    func renameList(id: UUID, to name: String) throws {}
+    func renameList(id: UUID, to name: String) throws -> GroceryList {
+        GroceryList(name: name)
+    }
 
     func deleteList(id: UUID) throws {}
 }

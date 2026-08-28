@@ -44,14 +44,28 @@ struct SwiftDataGroceryRepository: GroceryRepository {
         return list
     }
 
-    func renameList(id: UUID, to name: String) throws {
+    func renameList(id: UUID, to name: String) throws -> GroceryList {
         let trimmedName = try validatedName(name)
         guard let list = try list(withID: id) else {
             throw GroceryListError.notFound
         }
+        let previousName = list.name
+        let previousUpdatedAt = list.updatedAt
         list.name = trimmedName
         list.updatedAt = Date()
-        try persist()
+        do {
+            try persist()
+        } catch {
+            // persist() rolled the context back, but SwiftData's rollback
+            // discards the context's pending change without restoring the
+            // in-memory property values of already-fetched models. Restore
+            // the prior name and updatedAt explicitly so callers observe the
+            // persisted state, never the failed mutation.
+            list.name = previousName
+            list.updatedAt = previousUpdatedAt
+            throw error
+        }
+        return list
     }
 
     func deleteList(id: UUID) throws {
