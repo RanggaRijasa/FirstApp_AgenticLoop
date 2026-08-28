@@ -49,6 +49,34 @@ struct GroceryListPersistenceTests {
         #expect(try repository.fetchLists().isEmpty)
     }
 
+    @Test func createSaveFailureRollsBackSoRetryDoesNotDuplicate() async throws {
+        let schema = Schema([GroceryList.self])
+        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [configuration])
+        let context = container.mainContext
+        var repository = SwiftDataGroceryRepository(modelContainer: container)
+
+        // First create fails: the repository's real insert-then-save path is
+        // exercised, with the save itself failing deterministically.
+        repository.saveInterceptor = {
+            throw UnderlyingPersistenceFailure()
+        }
+        #expect(throws: (any Error).self) {
+            _ = try repository.createList(named: "Weekly Groceries")
+        }
+        // The failed save must not leave the model pending in the context;
+        // otherwise a later successful save persists it as a duplicate.
+        #expect(context.insertedModelsArray.isEmpty)
+
+        // Retry after the store recovers persists exactly one trimmed list.
+        repository.saveInterceptor = nil
+        let retried = try repository.createList(named: "  Weekly Groceries  ")
+        let lists = try repository.fetchLists()
+        #expect(lists.count == 1)
+        #expect(lists.first?.id == retried.id)
+        #expect(lists.first?.name == "Weekly Groceries")
+    }
+
     @Test func fetchReturnsAllCreatedLists() async throws {
         let repository = try makeRepository()
 
@@ -120,4 +148,9 @@ struct GroceryListPersistenceTests {
             try repository.deleteList(id: UUID())
         }
     }
+}
+
+/// Stand-in for an underlying persistence error used by the save interceptor.
+private struct UnderlyingPersistenceFailure: LocalizedError {
+    var errorDescription: String? { "NSPersistentStore save failed (code 134060)" }
 }

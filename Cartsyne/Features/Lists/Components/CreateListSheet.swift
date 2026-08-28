@@ -29,9 +29,12 @@ struct CreateListSheet: View {
                         .onSubmit(save)
                         .accessibilityLabel("List name")
                     if let errorText = model.createError {
+                        // VoiceOver announces the actionable message
+                        // ("We couldn't create your list. Please try again.")
+                        // itself, not a generic label: the text is the
+                        // accessible content with no label override.
                         Text(errorText)
                             .foregroundStyle(.red)
-                            .accessibilityLabel("Create list error")
                     }
                 }
             }
